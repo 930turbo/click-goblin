@@ -15,6 +15,8 @@ namespace ClickGoblin
         public decimal Seconds = 0.5m;
         public int HoldMs = 50, DelaySeconds = 0, MaxClicks = 0, DurationSeconds = 0;
         public bool AlwaysOnTop = false, TargetOnly = false;
+        public bool MultiEnabled = false, Staggered = false, MinimizeToTray = false;
+        public int ButtonMask = 3, AccentIndex = 0, BackgroundIndex = 0;
         public decimal SpeedStep = 5;
         public int ToggleKey = (int)Keys.F6, FasterKey = (int)Keys.F8, SlowerKey = (int)Keys.F7, StopKey = (int)Keys.F10;
         internal static string PathName { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ClickGoblin", "settings.xml"); } }
@@ -65,6 +67,9 @@ namespace ClickGoblin
             MaxClicks = Math.Max(0, Math.Min(1000000, MaxClicks));
             DurationSeconds = Math.Max(0, Math.Min(86400, DurationSeconds));
             SpeedStep = Math.Max(0.1m, Math.Min(100, SpeedStep));
+            ButtonMask &= 31;
+            AccentIndex = Math.Max(0, Math.Min(4, AccentIndex));
+            BackgroundIndex = Math.Max(0, Math.Min(2, BackgroundIndex));
             if (!HotkeyRules.Valid(ToggleKey)) ToggleKey = (int)Keys.F6;
             if (!HotkeyRules.Valid(FasterKey)) FasterKey = (int)Keys.F8;
             if (!HotkeyRules.Valid(SlowerKey)) SlowerKey = (int)Keys.F7;

@@ -1,9 +1,9 @@
 # Click Goblin usage
 
-Open dist\ClickGoblin.exe. Choose a mouse button and either CPS or an
+Open ClickGoblin.exe (or dist\ClickGoblin.exe when building from source). Choose a mouse button and either Clicks Per Second or an
 interval. Start / stop with F6, speed up with F8, slow down with F7,
 or stop immediately with F10. Use Hotkeys to record your own shortcuts
-and set how much each speed adjustment changes the CPS.
+and set how much each speed adjustment changes the Clicks Per Second.
 
 Hotkeys accept F1-F24 (with optional modifiers), or Ctrl / Alt plus a
 letter, number, arrow up/down, or plus/minus. All four must be different
@@ -12,9 +12,9 @@ Editing temporarily unregisters shortcuts; leaving the box applies them.
 Hotkey editing is disabled during a session. Avoid game key bindings.
 
 ## Click settings
-- CPS is a target up to 500. Actual throughput depends on Windows and
+- Clicks Per Second is a target up to 500. Actual throughput depends on Windows and
   the app. The worker sleeps between events; it does not spin at 100% CPU.
-- Interval and CPS are linked. You can adjust speed while running.
+- Interval and Clicks Per Second are linked. You can adjust speed while running.
 - Hold defaults to 50 ms for games. Actual hold is capped at half the
   interval, leaving the other half for the button to be released.
 - Left, right, middle and both side buttons are supported.
@@ -32,8 +32,10 @@ Hotkey editing is disabled during a session. Avoid game key bindings.
 - Minimize keeps it working. Closing stops clicking and releases input.
 - Every session starts fresh; the program always opens stopped.
 
-For Skyrim, try Left, 2 CPS and 50 ms hold. If the game runs elevated,
-run Click Goblin as administrator too. Some games reject simulated input.
+Some programs require Click Goblin to run as administrator, especially
+when the receiving program is also elevated. Right-click Click Goblin and
+choose **Run as administrator** if input is blocked. Compatibility with
+simulated input depends on the receiving program.
 
 Preferences: %LOCALAPPDATA%\ClickGoblin\settings.xml
 Earlier LightClick timing settings are imported on first launch.
@@ -43,3 +45,31 @@ There are no network connections, installers, startup entries or services.
 
 To remove, close the app and delete its files and desktop shortcut.
 You can optionally delete the preferences folder too.
+
+## Goblin Gang / Multi-Clicker
+
+Enable Goblin Gang to click several mouse buttons with one hotkey. Select
+Left, Right, Middle, Side X1, or Side X2 in any combination. Turn it off
+to return to the single-button selector on Clicking.
+
+- **Together:** all selected buttons are pressed in one Windows input
+  batch, then released together after the effective hold time.
+- **Staggered:** button presses are spread evenly over each interval,
+  in Left / Right / Middle / Side X1 / Side X2 order.
+- Clicks Per Second applies to each selected button. The click limit
+  counts completed groups, rather than individual button presses.
+- Hold time is capped at half the interval in Together mode, or half
+  each button's time slot in Staggered mode, with a minimum of 1 ms.
+- Very fast multi-button patterns may run slower than the requested
+  speed. Inputs never try to catch up by emitting bursts after a stall.
+- App lock, time limits and emergency stop cover the whole group.
+  Stopping also releases the currently held button or group.
+
+## Settings
+
+Choose Lilac, Mint, Rose, Sky or Amber accents with Midnight, Charcoal or
+Deep blue backgrounds. Colors update immediately and are saved.
+
+Optionally minimize to the notification area. Double-click the goblin
+icon to reopen, or use its menu to start, stop or quit. Hotkeys remain
+active while hidden; closing the window always quits and releases input.

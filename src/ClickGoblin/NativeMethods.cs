@@ -41,6 +41,16 @@ namespace ClickGoblin
             INPUT[] down = Event(button, true), up = Event(button, false);
             return delegate(bool pressed) { return SendInput(1, pressed ? down : up, Marshal.SizeOf(typeof(INPUT))) == 1; };
         }
+        internal static Func<bool, bool> GroupSender(int[] buttons)
+        {
+            INPUT[] down = new INPUT[buttons.Length], up = new INPUT[buttons.Length];
+            for (int i = 0; i < buttons.Length; i++) { down[i] = Event(buttons[i], true)[0]; up[i] = Event(buttons[i], false)[0]; }
+            return delegate(bool pressed) {
+                uint sent = SendInput((uint)buttons.Length, pressed ? down : up, Marshal.SizeOf(typeof(INPUT)));
+                if (pressed && sent != buttons.Length) SendInput((uint)up.Length, up, Marshal.SizeOf(typeof(INPUT)));
+                return sent == buttons.Length;
+            };
+        }
         internal static Func<bool> AppGate()
         {
             uint target = 0, self = (uint)Process.GetCurrentProcess().Id;

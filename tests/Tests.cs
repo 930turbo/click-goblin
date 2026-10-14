@@ -94,11 +94,62 @@ namespace ClickGoblin
                     }
                 }
                 string root = Path.Combine(args[0], "preferences-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(root);
+                using (ManualResetEvent done = new ManualResetEvent(false))
+                {
+                    int[] presses = new int[3], releases = new int[3];
+                    long[] starts = new long[3]; Stopwatch time = Stopwatch.StartNew();
+                    using (ClickEngine e = new ClickEngine(150, 10, 0, 1, 0, delegate(bool d) { throw new Exception("Wrong sender"); }, null,
+                        delegate(EndReason r) { done.Set(); }, 3, delegate(int channel, bool downEvent) {
+                            if (downEvent) { presses[channel]++; starts[channel] = time.ElapsedMilliseconds; } else releases[channel]++;
+                            return true;
+                        }))
+                    {
+                        e.Start(); Check(done.WaitOne(3000), "Staggered group completes");
+                        for (int i = 0; i < 3; i++) Check(presses[i] == 1 && releases[i] == 1, "Each staggered button released");
+                        Check(starts[1] - starts[0] >= 30 && starts[2] - starts[1] >= 30, "Staggered phase spacing");
+                        Check(e.Count == 1, "Group counts as one cycle");
+                    }
+                }
+                using (ManualResetEvent pressed = new ManualResetEvent(false))
+                {
+                    int releases = 0;
+                    using (ClickEngine e = new ClickEngine(300, 50, 0, 0, 0, null, null, null, 2,
+                        delegate(int channel, bool d) { if (d) pressed.Set(); else releases++; return true; }))
+                    { e.Start(); Check(pressed.WaitOne(3000), "Multi-button press"); }
+                    Check(releases == 1, "Multi-button stop releases held channel");
+                }
+                using (ManualResetEvent done = new ManualResetEvent(false))
+                {
+                    int downs = 0, ups = 0;
+                    using (ClickEngine e = new ClickEngine(10, 1, 0, 2, 0,
+                        delegate(bool d) { if (d) downs += 3; else ups += 3; return true; }, null, delegate(EndReason r) { done.Set(); }))
+                    { e.Start(); Check(done.WaitOne(3000) && downs == 6 && ups == 6 && e.Count == 2, "Together group cycle limit"); }
+                }
+                using (ManualResetEvent secondHeld = new ManualResetEvent(false))
+                {
+                    int[] ups = new int[2];
+                    using (ClickEngine e = new ClickEngine(100, 20, 0, 0, 0, null, null, null, 2,
+                        delegate(int channel, bool d) { if (d && channel == 1) secondHeld.Set(); if (!d) ups[channel]++; return true; }))
+                    { e.Start(); Check(secondHeld.WaitOne(3000), "Second staggered channel held"); }
+                    Check(ups[0] == 1 && ups[1] == 1, "Stopping second channel releases exact held button");
+                }
+                using (ManualResetEvent firstDone = new ManualResetEvent(false))
+                using (ManualResetEvent finished = new ManualResetEvent(false))
+                {
+                    using (ClickEngine e = new ClickEngine(60000, 1, 0, 1, 0, null, null, delegate(EndReason r) { finished.Set(); }, 2,
+                        delegate(int channel, bool d) { if (!d && channel == 0) firstDone.Set(); return true; }))
+                    {
+                        e.Start(); e.SetInterval(20); Check(firstDone.WaitOne(3000), "Staggered first channel");
+                        e.SetInterval(10); Check(finished.WaitOne(3000), "Staggered live speed wakes phase wait");
+                    }
+                }
                 string path = Path.Combine(root, "settings.xml");
-                Preferences p = new Preferences { Seconds = 0.002m, DurationSeconds = 120, TargetOnly = true, SpeedStep = 10, FasterKey = (int)(Keys.Control | Keys.Up) };
+                Preferences p = new Preferences { Seconds = 0.002m, DurationSeconds = 120, TargetOnly = true, SpeedStep = 10, FasterKey = (int)(Keys.Control | Keys.Up),
+                    MultiEnabled = true, Staggered = true, ButtonMask = 21, AccentIndex = 3, BackgroundIndex = 2, MinimizeToTray = true };
                 Check(p.Save(path), "Settings saved");
                 Preferences saved = Preferences.Load(path);
                 Check(saved.Seconds == 0.002m && saved.DurationSeconds == 120 && saved.TargetOnly && saved.SpeedStep == 10 && saved.FasterKey == (int)(Keys.Control | Keys.Up), "Settings round trip");
+                Check(saved.MultiEnabled && saved.Staggered && saved.ButtonMask == 21 && saved.AccentIndex == 3 && saved.BackgroundIndex == 2 && saved.MinimizeToTray, "Multi-button and appearance settings persist");
                 File.WriteAllText(path, "bad xml"); Check(Preferences.Load(path).Seconds == 0.5m, "Corrupt preferences fallback");
                 if (!skipUi)
                 {
@@ -108,6 +159,29 @@ namespace ClickGoblin
                     f.Show(); Check((bool)Field(f, "bound"), "Default hotkeys bind");
                     Shot(f, Path.Combine(args[0], "clicking.png"));
                     Call(f, "ShowPage", true); Shot(f, Path.Combine(args[0], "hotkeys.png"));
+                    Call(f, "ShowPage", false);
+                    Call(f, "SelectPage", 1);
+                    ((CheckBox)Field(f, "multi")).Checked = true;
+                    Shot(f, Path.Combine(args[0], "gang.png"));
+                    Check(!((ComboBox)Field(f, "buttonChoice")).Enabled, "Multi mode replaces single selector");
+                    CheckBox[] gangButtons = (CheckBox[])Field(f, "multiButtons");
+                    foreach (CheckBox box in gangButtons) box.Checked = false;
+                    Check(!((Button)Field(f, "toggle")).Enabled, "Empty group cannot start");
+                    gangButtons[0].Checked = gangButtons[1].Checked = true;
+                    ((CheckBox)Field(f, "multi")).Checked = false;
+                    Call(f, "SelectPage", 3);
+                    Shot(f, Path.Combine(args[0], "settings.png"));
+                    ((ComboBox)Field(f, "accentChoice")).SelectedIndex = 1;
+                    Check(Theme.Accent.G > Theme.Accent.R, "Accent changes live");
+                    ((ComboBox)Field(f, "backgroundChoice")).SelectedIndex = 2;
+                    Check(Theme.Background.B > Theme.Background.R, "Background changes live");
+                    ((ComboBox)Field(f, "accentChoice")).SelectedIndex = 0;
+                    ((ComboBox)Field(f, "backgroundChoice")).SelectedIndex = 0;
+                    ((CheckBox)Field(f, "toTray")).Checked = true;
+                    f.WindowState = FormWindowState.Minimized;
+                    Check(!f.Visible && ((NotifyIcon)Field(f, "tray")).Visible, "Minimize to tray");
+                    Call(f, "RestoreWindow"); Check(f.Visible && !((NotifyIcon)Field(f, "tray")).Visible, "Restore from tray");
+                    ((CheckBox)Field(f, "toTray")).Checked = false;
                     Call(f, "ShowPage", false);
                     NumericUpDown rate = (NumericUpDown)Field(f, "cps");
                     NumericUpDown interval = (NumericUpDown)Field(f, "interval");
@@ -131,7 +205,7 @@ namespace ClickGoblin
                     Call(f, "Toggle"); f.Close(); Check(Field(f, "engine") == null, "Close cancels countdown");
                 }
                 }
-                Console.WriteLine("PASS: native input, mouse buttons, timing, click limits, cancellation/release, app gate, duration, live speed, high CPS and preferences. No real clicks generated.");
+                Console.WriteLine("PASS: native input, mouse buttons, single and grouped cycles, staggered phases, release on stop, app gate, limits, live speed and preferences. No real clicks generated.");
                 Console.WriteLine(skipUi ? "UI checks skipped (CI mode)." : "PASS: UI, hotkey conflicts, CPS sync and close.");
                 return 0;
             }

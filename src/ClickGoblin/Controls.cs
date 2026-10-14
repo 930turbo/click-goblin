@@ -9,13 +9,38 @@ namespace ClickGoblin
 {
     internal static class Theme
     {
-        internal static readonly Color Background = Color.FromArgb(20, 22, 30);
-        internal static readonly Color Ink = Color.FromArgb(238, 240, 247);
-        internal static readonly Color Muted = Color.FromArgb(157, 167, 188);
-        internal static readonly Color Accent = Color.FromArgb(180, 153, 255);
-        internal static readonly Color Surface = Color.FromArgb(29, 32, 43);
-        internal static readonly Color Field = Color.FromArgb(38, 42, 56);
-        internal static readonly Color Border = Color.FromArgb(52, 58, 75);
+        internal static Color Background = Color.FromArgb(17, 19, 28);
+        internal static Color Ink = Color.FromArgb(248, 249, 253);
+        internal static Color Muted = Color.FromArgb(195, 204, 222);
+        internal static Color Accent = Color.FromArgb(189, 165, 255);
+        internal static Color Surface = Color.FromArgb(27, 31, 43);
+        internal static Color Field = Color.FromArgb(42, 48, 64);
+        internal static Color Border = Color.FromArgb(78, 88, 112);
+        internal static readonly string FontName = PickFont();
+        private static string PickFont()
+        {
+            using (Font font = new Font("Segoe UI Variable Text", 10)) if (font.Name == "Segoe UI Variable Text") return font.Name;
+            using (Font font = new Font("Bahnschrift", 10)) if (font.Name == "Bahnschrift") return font.Name;
+            return "Segoe UI";
+        }
+        internal static void Palette(int accent, int background)
+        {
+            Color[] accents = { Color.FromArgb(189, 165, 255), Color.FromArgb(119, 229, 191), Color.FromArgb(255, 168, 178), Color.FromArgb(130, 202, 255), Color.FromArgb(255, 210, 125) };
+            Accent = accents[Math.Max(0, Math.Min(4, accent))];
+            Background = background == 1 ? Color.FromArgb(23, 24, 27) : background == 2 ? Color.FromArgb(12, 23, 37) : Color.FromArgb(17, 19, 28);
+            Surface = background == 1 ? Color.FromArgb(36, 37, 41) : background == 2 ? Color.FromArgb(21, 37, 54) : Color.FromArgb(27, 31, 43);
+            Field = ControlPaint.Light(Surface, 0.12f);
+        }
+        internal static void Refresh(Control root)
+        {
+            root.BackColor = root is InputFrame || root is CheckBox ? Surface : root is NumericUpDown || root is TextBox || root is ComboBox ? Field : Background;
+            root.ForeColor = root.Tag as string == "muted" ? Muted : root.Tag as string == "accent" ? Accent : Ink;
+            if (root is Label) root.BackColor = Color.Transparent;
+            LinkLabel link = root as LinkLabel;
+            if (link != null) { link.LinkColor = Muted; link.ActiveLinkColor = Accent; }
+            foreach (Control child in root.Controls) Refresh(child);
+            root.Invalidate();
+        }
         internal static GraphicsPath Round(RectangleF box, float radius)
         {
             float d = radius * 2;
@@ -30,9 +55,10 @@ namespace ClickGoblin
         internal static Label Label(Control parent, string text, int x, int y, int width, float size, bool bold, Color color)
         {
             Label label = new Label { Text = text, Location = new Point(x, y), Size = new Size(width, 25),
-                Font = new Font("Segoe UI", size, bold ? FontStyle.Bold : FontStyle.Regular), ForeColor = color,
+                Font = new Font(FontName, size, bold ? FontStyle.Bold : FontStyle.Regular), ForeColor = color,
                 BackColor = Color.Transparent, AutoEllipsis = true };
             parent.Controls.Add(label);
+            label.Tag = color == Muted ? "muted" : color == Accent ? "accent" : "primary";
             return label;
         }
     }
@@ -60,7 +86,7 @@ namespace ClickGoblin
             FlatStyle = FlatStyle.Flat;
             FlatAppearance.BorderSize = 0;
             Cursor = Cursors.Hand;
-            Font = new Font("Segoe UI", 11, FontStyle.Bold);
+            Font = new Font(Theme.FontName, 11, FontStyle.Bold);
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
         }
         protected override void OnMouseEnter(EventArgs e) { hover = true; Invalidate(); base.OnMouseEnter(e); }
@@ -69,7 +95,7 @@ namespace ClickGoblin
         {
             e.Graphics.Clear(Theme.Background);
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            Color color = !Enabled ? Theme.Muted : Active ? Color.FromArgb(159, 54, 73) : Color.FromArgb(103, 76, 179);
+            Color color = !Enabled ? Theme.Border : Active ? Color.FromArgb(159, 54, 73) : Color.FromArgb(Theme.Accent.R / 2, Theme.Accent.G / 2, Theme.Accent.B / 2);
             if (hover && Enabled) color = ControlPaint.Dark(color, 0.12f);
             using (GraphicsPath path = Theme.Round(new RectangleF(0, 0, Width - 1, Height - 1), 10))
             using (SolidBrush brush = new SolidBrush(color)) e.Graphics.FillPath(brush, path);
@@ -99,6 +125,14 @@ namespace ClickGoblin
                 e.Graphics.FillPath(ink, head);
                 e.Graphics.FillEllipse(eye, 14, 18, 4, 4); e.Graphics.FillEllipse(eye, 22, 18, 4, 4);
                 e.Graphics.DrawArc(grin, 16, 23, 8, 5, 0, 180);
+                e.Graphics.FillEllipse(ink, 15.5f, 19.5f, 1.5f, 1.5f); e.Graphics.FillEllipse(ink, 23.5f, 19.5f, 1.5f, 1.5f);
+                e.Graphics.FillPolygon(eye, new PointF[] { new PointF(18, 26), new PointF(20, 26), new PointF(19, 29) });
+                using (SolidBrush blush = new SolidBrush(Color.FromArgb(235, 153, 183)))
+                {
+                    e.Graphics.FillEllipse(blush, 12, 23, 3, 1.5f); e.Graphics.FillEllipse(blush, 25, 23, 3, 1.5f);
+                    e.Graphics.FillPolygon(blush, new PointF[] { new PointF(7, 12), new PointF(8, 18), new PointF(12, 15) });
+                    e.Graphics.FillPolygon(blush, new PointF[] { new PointF(33, 12), new PointF(32, 18), new PointF(28, 15) });
+                }
             }
         }
     }
@@ -121,7 +155,7 @@ namespace ClickGoblin
             ReadOnly = true; ShortcutsEnabled = false;
             BackColor = Theme.Field; ForeColor = Theme.Ink;
             BorderStyle = BorderStyle.None;
-            Font = new Font("Segoe UI", 11);
+            Font = new Font(Theme.FontName, 11);
             TextAlign = HorizontalAlignment.Center;
         }
         internal void SetBinding(int value) { Binding = value; Text = HotkeyRules.Text(value); }
@@ -160,6 +194,30 @@ namespace ClickGoblin
             using (SolidBrush fill = new SolidBrush(Theme.Field))
             using (Pen border = new Pen(input.ContainsFocus ? Theme.Accent : Theme.Border))
             { e.Graphics.FillPath(fill, shape); e.Graphics.DrawPath(border, shape); }
+        }
+    }
+    internal sealed class TabButton : Button
+    {
+        internal bool Selected;
+        private bool hover;
+        internal TabButton()
+        {
+            FlatStyle = FlatStyle.Flat; FlatAppearance.BorderSize = 0; Cursor = Cursors.Hand;
+            Font = new Font(Theme.FontName, 10, FontStyle.Bold);
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
+        }
+        protected override void OnMouseEnter(EventArgs e) { hover = true; Invalidate(); base.OnMouseEnter(e); }
+        protected override void OnMouseLeave(EventArgs e) { hover = false; Invalidate(); base.OnMouseLeave(e); }
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            e.Graphics.Clear(Theme.Background); e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            using (GraphicsPath shape = Theme.Round(new RectangleF(0.5f, 0.5f, Width - 2, Height - 2), 9))
+            using (SolidBrush fill = new SolidBrush(Selected ? Theme.Field : hover ? Theme.Surface : Theme.Background))
+            using (Pen outline = new Pen(Selected ? Theme.Accent : hover ? Theme.Border : Theme.Background))
+            { e.Graphics.FillPath(fill, shape); e.Graphics.DrawPath(outline, shape); }
+            TextRenderer.DrawText(e.Graphics, Text, Font, ClientRectangle, Selected ? Theme.Ink : Theme.Muted,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
+            if (Focused && ShowFocusCues) ControlPaint.DrawFocusRectangle(e.Graphics, new Rectangle(7, 7, Width - 15, Height - 15));
         }
     }
 }
