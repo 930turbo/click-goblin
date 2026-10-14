@@ -16,24 +16,20 @@ namespace ClickGoblin
         internal static Color Surface = Color.FromArgb(27, 31, 43);
         internal static Color Field = Color.FromArgb(42, 48, 64);
         internal static Color Border = Color.FromArgb(78, 88, 112);
-        internal static readonly string FontName = PickFont();
-        private static string PickFont()
-        {
-            using (Font font = new Font("Segoe UI Variable Text", 10)) if (font.Name == "Segoe UI Variable Text") return font.Name;
-            using (Font font = new Font("Bahnschrift", 10)) if (font.Name == "Bahnschrift") return font.Name;
-            return "Segoe UI";
-        }
+        internal static Font Font(float size, bool bold) { return AppFont.Create(size, bold); }
         internal static void Palette(int accent, int background)
         {
-            Color[] accents = { Color.FromArgb(189, 165, 255), Color.FromArgb(119, 229, 191), Color.FromArgb(255, 168, 178), Color.FromArgb(130, 202, 255), Color.FromArgb(255, 210, 125) };
-            Accent = accents[Math.Max(0, Math.Min(4, accent))];
-            Background = background == 1 ? Color.FromArgb(23, 24, 27) : background == 2 ? Color.FromArgb(12, 23, 37) : Color.FromArgb(17, 19, 28);
-            Surface = background == 1 ? Color.FromArgb(36, 37, 41) : background == 2 ? Color.FromArgb(21, 37, 54) : Color.FromArgb(27, 31, 43);
-            Field = ControlPaint.Light(Surface, 0.12f);
+            Color[] accents = { Color.FromArgb(189, 165, 255), Color.FromArgb(119, 229, 191), Color.FromArgb(255, 168, 178), Color.FromArgb(130, 202, 255), Color.FromArgb(255, 210, 125),
+                Color.FromArgb(255, 177, 137), Color.FromArgb(157, 227, 255), Color.FromArgb(219, 178, 255), Color.FromArgb(216, 239, 145), Color.FromArgb(255, 169, 210), Color.FromArgb(137, 235, 223), Color.FromArgb(226, 231, 242) };
+            Color[] backgrounds = { Color.FromArgb(17, 19, 28), Color.FromArgb(23, 24, 27), Color.FromArgb(12, 23, 37), Color.FromArgb(25, 18, 31), Color.FromArgb(12, 27, 24), Color.FromArgb(30, 23, 20) };
+            Accent = accents[Math.Max(0, Math.Min(11, accent))];
+            Background = backgrounds[Math.Max(0, Math.Min(5, background))];
+            Surface = Color.FromArgb(Background.R + 11, Background.G + 12, Background.B + 14);
+            Field = Color.FromArgb(Surface.R + 14, Surface.G + 15, Surface.B + 18);
         }
         internal static void Refresh(Control root)
         {
-            root.BackColor = root is InputFrame || root is CheckBox ? Surface : root is NumericUpDown || root is TextBox || root is ComboBox ? Field : Background;
+            root.BackColor = root is InputFrame || root is CheckBox ? Surface : root is NumberField || root is TextBox || root is ChoiceField || root is HotkeyBox ? Field : Background;
             root.ForeColor = root.Tag as string == "muted" ? Muted : root.Tag as string == "accent" ? Accent : Ink;
             if (root is Label) root.BackColor = Color.Transparent;
             LinkLabel link = root as LinkLabel;
@@ -55,7 +51,7 @@ namespace ClickGoblin
         internal static Label Label(Control parent, string text, int x, int y, int width, float size, bool bold, Color color)
         {
             Label label = new Label { Text = text, Location = new Point(x, y), Size = new Size(width, 25),
-                Font = new Font(FontName, size, bold ? FontStyle.Bold : FontStyle.Regular), ForeColor = color,
+                Font = Font(size, bold), ForeColor = color,
                 BackColor = Color.Transparent, AutoEllipsis = true };
             parent.Controls.Add(label);
             label.Tag = color == Muted ? "muted" : color == Accent ? "accent" : "primary";
@@ -86,7 +82,7 @@ namespace ClickGoblin
             FlatStyle = FlatStyle.Flat;
             FlatAppearance.BorderSize = 0;
             Cursor = Cursors.Hand;
-            Font = new Font(Theme.FontName, 11, FontStyle.Bold);
+            Font = Theme.Font(11, true);
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
         }
         protected override void OnMouseEnter(EventArgs e) { hover = true; Invalidate(); base.OnMouseEnter(e); }
@@ -125,40 +121,22 @@ namespace ClickGoblin
                 e.Graphics.FillPath(ink, head);
                 e.Graphics.FillEllipse(eye, 14, 18, 4, 4); e.Graphics.FillEllipse(eye, 22, 18, 4, 4);
                 e.Graphics.DrawArc(grin, 16, 23, 8, 5, 0, 180);
-                e.Graphics.FillEllipse(ink, 15.5f, 19.5f, 1.5f, 1.5f); e.Graphics.FillEllipse(ink, 23.5f, 19.5f, 1.5f, 1.5f);
-                e.Graphics.FillPolygon(eye, new PointF[] { new PointF(18, 26), new PointF(20, 26), new PointF(19, 29) });
-                using (SolidBrush blush = new SolidBrush(Color.FromArgb(235, 153, 183)))
-                {
-                    e.Graphics.FillEllipse(blush, 12, 23, 3, 1.5f); e.Graphics.FillEllipse(blush, 25, 23, 3, 1.5f);
-                    e.Graphics.FillPolygon(blush, new PointF[] { new PointF(7, 12), new PointF(8, 18), new PointF(12, 15) });
-                    e.Graphics.FillPolygon(blush, new PointF[] { new PointF(33, 12), new PointF(32, 18), new PointF(28, 15) });
-                }
+
             }
         }
     }
 
-    internal sealed class RateControl : NumericUpDown
-    {
-        protected override void UpdateEditText()
-        {
-            // Preserve precision for long intervals without padding every rate with zeroes.
-            Text = Value.ToString("0.######", CultureInfo.CurrentCulture);
-        }
-    }
-
-    internal sealed class HotkeyBox : TextBox
+    internal sealed class HotkeyBox : Control
     {
         internal int Binding;
         internal event EventHandler BindingChanged;
         internal HotkeyBox()
         {
-            ReadOnly = true; ShortcutsEnabled = false;
-            BackColor = Theme.Field; ForeColor = Theme.Ink;
-            BorderStyle = BorderStyle.None;
-            Font = new Font(Theme.FontName, 11);
-            TextAlign = HorizontalAlignment.Center;
+            SetStyle(ControlStyles.Selectable | ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
+            TabStop = true; Cursor = Cursors.Hand; Font = Theme.Font(11, false);
         }
-        internal void SetBinding(int value) { Binding = value; Text = HotkeyRules.Text(value); }
+        internal void SetBinding(int value) { Binding = value; Text = HotkeyRules.Text(value); Invalidate(); }
+        protected override void OnClick(EventArgs e) { base.OnClick(e); Focus(); }
         protected override void OnKeyDown(KeyEventArgs e)
         {
             base.OnKeyDown(e);
@@ -169,6 +147,12 @@ namespace ClickGoblin
                 SetBinding((int)e.KeyData);
                 if (BindingChanged != null) BindingChanged(this, EventArgs.Empty);
             }
+        }
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            e.Graphics.Clear(Theme.Field);
+            TextRenderer.DrawText(e.Graphics, Text, Font, ClientRectangle, Enabled ? Theme.Ink : Theme.Muted,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
         }
     }
 
@@ -183,7 +167,7 @@ namespace ClickGoblin
             BackColor = Theme.Surface;
             control.Enter += delegate { Invalidate(); };
             control.Leave += delegate { Invalidate(); };
-            control.SetBounds(12, 10, width - 24, 26);
+            control.SetBounds(12, 8, width - 24, 28);
             Controls.Add(control);
         }
         protected override void OnPaintBackground(PaintEventArgs e)
@@ -203,7 +187,7 @@ namespace ClickGoblin
         internal TabButton()
         {
             FlatStyle = FlatStyle.Flat; FlatAppearance.BorderSize = 0; Cursor = Cursors.Hand;
-            Font = new Font(Theme.FontName, 10, FontStyle.Bold);
+            Font = Theme.Font(10, true);
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
         }
         protected override void OnMouseEnter(EventArgs e) { hover = true; Invalidate(); base.OnMouseEnter(e); }

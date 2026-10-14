@@ -29,7 +29,7 @@ Hotkey editing is disabled during a session. Avoid game key bindings.
   excluding Click Goblin. It pauses in other apps and resumes when you
   return. If you start from the app's button with app lock enabled, you
   get at least 3 seconds to switch into the intended app.
-- Minimize keeps it working. Closing stops clicking and releases input.
+- Minimize keeps it working. Closing quits unless close-to-tray is enabled.
 - Every session starts fresh; the program always opens stopped.
 
 Some programs require Click Goblin to run as administrator, especially
@@ -67,9 +67,31 @@ to return to the single-button selector on Clicking.
 
 ## Settings
 
-Choose Lilac, Mint, Rose, Sky or Amber accents with Midnight, Charcoal or
-Deep blue backgrounds. Colors update immediately and are saved.
+Choose from 12 accent colors and 6 dark backgrounds. Colors update
+immediately and are saved. The bundled Outfit font is available without
+installing any fonts or connecting to the internet. Custom switches,
+pickers and number fields stay readable when disabled. Number fields
+accept typed values, plus/minus clicks, and Up/Down keys while focused.
 
-Optionally minimize to the notification area. Double-click the goblin
-icon to reopen, or use its menu to start, stop or quit. Hotkeys remain
-active while hidden; closing the window always quits and releases input.
+**Minimize / close to tray:** both the minimize button and X hide the app
+while it keeps running. Double-click the goblin icon to reopen. Use Quit
+in the window or tray menu to stop clicking and exit completely. Windows
+shutdown still stops the app normally. With this setting off, X quits.
+
+**Soft toggle sound:** off by default. Turn it on for a small higher tone
+when starting, and a lower tone when stopping or finishing a session.
+There is no sound on every click.
+
+**Consume my hotkeys:** on by default. Global shortcuts are reserved, and
+a keyboard filter consumes only the assigned keys, their repeats and
+releases, so normal keyboard messages do not also trigger the receiving
+app. Other typing passes through; no keystroke history is stored.
+Modifier combinations are supported. Shortcut capture temporarily pauses
+the filter while you edit a hotkey. Conflicts must still be resolved.
+
+Windows security boundaries and some raw-input applications can behave
+differently. This is not a guarantee of exclusive input in every program.
+Run Click Goblin as administrator when your target program is elevated,
+or choose a shortcut the target does not use.
+
+About includes the application and bundled-font license notices.

@@ -9,8 +9,8 @@ using System.Xml.Serialization;
 
 [assembly: System.Reflection.AssemblyTitle("Click Goblin")]
 [assembly: System.Reflection.AssemblyProduct("Click Goblin")]
-[assembly: System.Reflection.AssemblyVersion("4.0.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("4.0.0.0")]
+[assembly: System.Reflection.AssemblyVersion("5.0.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("5.0.0.0")]
 
 namespace ClickGoblin
 {

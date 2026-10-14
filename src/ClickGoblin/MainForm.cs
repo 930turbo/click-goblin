@@ -9,17 +9,21 @@ namespace ClickGoblin
 {
     internal sealed class MainForm : Form
     {
-        private readonly ComboBox buttonChoice = new ComboBox();
-        private readonly NumericUpDown cps = new RateControl(), interval = new NumericUpDown(), hold = new NumericUpDown();
-        private readonly NumericUpDown delay = new NumericUpDown(), limit = new NumericUpDown(), duration = new NumericUpDown(), step = new NumericUpDown();
-        private readonly CheckBox target = new CheckBox(), top = new CheckBox();
+        private readonly ChoiceField buttonChoice = new ChoiceField();
+        private readonly NumberField cps = new NumberField(), interval = new NumberField(), hold = new NumberField();
+        private readonly NumberField delay = new NumberField(), limit = new NumberField(), duration = new NumberField(), step = new NumberField();
+        private readonly ToggleSwitch target = new ToggleSwitch(), top = new ToggleSwitch();
         private readonly HotkeyBox[] keys = { new HotkeyBox(), new HotkeyBox(), new HotkeyBox(), new HotkeyBox() };
         private readonly Panel clicking = new Panel(), shortcuts = new Panel();
         private readonly Panel gangPage = new Panel(), settingsPage = new Panel();
         private readonly TabButton clickTab = new TabButton(), gangTab = new TabButton(), keysTab = new TabButton(), settingsTab = new TabButton();
-        private readonly CheckBox multi = new CheckBox(), toTray = new CheckBox();
-        private readonly CheckBox[] multiButtons = { new CheckBox(), new CheckBox(), new CheckBox(), new CheckBox(), new CheckBox() };
-        private readonly ComboBox multiTiming = new ComboBox(), accentChoice = new ComboBox(), backgroundChoice = new ComboBox();
+        private readonly ToggleSwitch multi = new ToggleSwitch(), toTray = new ToggleSwitch();
+        private readonly ToggleSwitch sound = new ToggleSwitch(), priority = new ToggleSwitch();
+        private readonly ToggleAudio audio = new ToggleAudio();
+        private GlobalHotkeys hotkeyFilter;
+        private bool forceExit;
+        private readonly ToggleSwitch[] multiButtons = { new ToggleSwitch(), new ToggleSwitch(), new ToggleSwitch(), new ToggleSwitch(), new ToggleSwitch() };
+        private readonly ChoiceField multiTiming = new ChoiceField(), accentChoice = new ChoiceField(), backgroundChoice = new ChoiceField();
         private readonly NotifyIcon tray = new NotifyIcon();
         private readonly ActionButton toggle = new ActionButton();
         private readonly LinkLabel reset = new LinkLabel();
@@ -47,7 +51,7 @@ namespace ClickGoblin
             FormBorderStyle = FormBorderStyle.Sizable; MinimumSize = new Size(600, 520);
             StartPosition = FormStartPosition.CenterScreen;
             BackColor = Theme.Background; ForeColor = Theme.Ink;
-            Font = new Font(Theme.FontName, 10); DoubleBuffered = true;
+            Font = Theme.Font(10, false); DoubleBuffered = true;
             Icon = Icon.ExtractAssociatedIcon(typeof(MainForm).Assembly.Location);
             Controls.Add(new BrandMark { Location = new Point(22, 19), Size = new Size(40, 40) });
             Theme.Label(this, "Click Goblin", 74, 14, 315, 23, true, Theme.Ink).Height = 42;
@@ -65,14 +69,6 @@ namespace ClickGoblin
             Card timing = MakeCard(clicking, 0, 260, "Click settings");
             Theme.Label(timing, "Mouse button", 24, 73, 210, 10, false, Theme.Ink);
             buttonChoice.Items.AddRange(new object[] { "Left", "Right", "Middle", "Side / X1", "Side / X2" });
-            buttonChoice.DropDownStyle = ComboBoxStyle.DropDownList; buttonChoice.FlatStyle = FlatStyle.Flat;
-            buttonChoice.DrawMode = DrawMode.OwnerDrawFixed;
-            buttonChoice.DrawItem += delegate(object sender, DrawItemEventArgs e) {
-                using (SolidBrush brush = new SolidBrush(Theme.Field)) e.Graphics.FillRectangle(brush, e.Bounds);
-                if (e.Index >= 0) TextRenderer.DrawText(e.Graphics, buttonChoice.Items[e.Index].ToString(), e.Font, e.Bounds, Theme.Ink, TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
-                e.DrawFocusRectangle();
-            };
-            buttonChoice.BackColor = Theme.Field; buttonChoice.ForeColor = Theme.Ink;
             timing.Controls.Add(new InputFrame(buttonChoice, 282, 62, 234));
             Theme.Label(timing, "Clicks Per Second", 24, 119, 234, 9, true, Theme.Muted);
             Theme.Label(timing, "Interval / seconds", 282, 119, 234, 9, true, Theme.Muted);
@@ -122,6 +118,10 @@ namespace ClickGoblin
             reset.Text = "Reset defaults"; reset.SetBounds(398, 835, 162, 23); reset.TextAlign = ContentAlignment.MiddleRight;
             reset.LinkColor = Theme.Muted; reset.ActiveLinkColor = Theme.Accent; reset.LinkBehavior = LinkBehavior.HoverUnderline;
             reset.LinkClicked += delegate { Apply(new Preferences()); Bind(); Save(); }; Controls.Add(reset);
+            LinkLabel quit = new LinkLabel { Text = "Quit", Location = new Point(22, 835), Size = new Size(90, 23), LinkBehavior = LinkBehavior.HoverUnderline };
+            quit.LinkClicked += delegate { QuitApplication(); }; Controls.Add(quit);
+            LinkLabel about = new LinkLabel { Text = "About", Location = new Point(106, 835), Size = new Size(90, 23), LinkBehavior = LinkBehavior.HoverUnderline };
+            about.LinkClicked += delegate { ShowAbout(); }; Controls.Add(about);
 
             Apply(initial);
             cps.ValueChanged += delegate { if (!syncing && !loading) ChangeRate(1m / cps.Value, true); };
@@ -188,31 +188,29 @@ namespace ClickGoblin
         }
         private void BuildSettingsPage()
         {
-            Card colors = MakeCard(settingsPage, 0, 300, "Appearance");
+            Card colors = MakeCard(settingsPage, 0, 244, "Appearance");
             Theme.Label(colors, "Accent color", 24, 71, 234, 10, false, Theme.Ink);
-            Combo(colors, accentChoice, 282, 62, 234, new object[] { "Lilac", "Mint", "Rose", "Sky", "Amber" });
+            Combo(colors, accentChoice, 282, 62, 234, new object[] { "Lilac", "Mint", "Rose", "Sky", "Amber", "Peach", "Glacier", "Orchid", "Lime", "Candy", "Lagoon", "Silver" });
             Theme.Label(colors, "Background", 24, 145, 234, 10, false, Theme.Ink);
-            Combo(colors, backgroundChoice, 282, 136, 234, new object[] { "Midnight", "Charcoal", "Deep blue" });
-            Theme.Label(colors, "Colors update immediately and are remembered.", 24, 215, 492, 10, false, Theme.Muted);
-            Theme.Label(colors, "High-contrast text stays readable in every palette.", 24, 254, 492, 9, false, Theme.Muted);
+            Combo(colors, backgroundChoice, 282, 136, 234, new object[] { "Midnight", "Charcoal", "Deep blue", "Plum", "Forest", "Espresso" });
+            Theme.Label(colors, "Colors update immediately and are remembered.", 24, 203, 492, 10, false, Theme.Muted);
             accentChoice.SelectedIndexChanged += delegate { if (!loading) { ApplyColors(); Save(); } };
             backgroundChoice.SelectedIndexChanged += delegate { if (!loading) { ApplyColors(); Save(); } };
-            Card behavior = MakeCard(settingsPage, 316, 224, "Window behavior");
-            toTray.Text = "Minimize to the notification area"; toTray.SetBounds(24, 65, 492, 30); behavior.Controls.Add(toTray);
-            Theme.Label(behavior, "Double-click the tray icon to reopen Click Goblin.", 24, 111, 492, 10, false, Theme.Muted);
-            Theme.Label(behavior, "Hotkeys continue to work while the window is hidden.", 24, 153, 492, 9, false, Theme.Muted);
-            Theme.Label(behavior, "Closing the window always stops clicking and quits.", 24, 188, 492, 9, false, Theme.Muted);
+            Card behavior = MakeCard(settingsPage, 260, 280, "Behavior and feedback");
+            toTray.Text = "Minimize / close to tray"; toTray.SetBounds(24, 60, 492, 30); behavior.Controls.Add(toTray);
+            sound.Text = "Soft sound when starting or stopping"; sound.SetBounds(24, 108, 492, 30); behavior.Controls.Add(sound);
+            priority.Text = "Consume my hotkeys in other apps"; priority.SetBounds(24, 156, 492, 30); behavior.Controls.Add(priority);
+            Theme.Label(behavior, "Quit exits fully. Double-click the tray icon to reopen.", 24, 212, 492, 9, false, Theme.Muted);
+            Theme.Label(behavior, "Some elevated or raw-input apps handle keys differently.", 24, 245, 492, 8.5f, false, Theme.Muted);
             toTray.CheckedChanged += delegate { if (!loading) Save(); };
+            sound.CheckedChanged += delegate { if (!loading) Save(); };
+            priority.CheckedChanged += delegate { if (!loading) { Bind(); Save(); } };
+            tips.SetToolTip(priority, "Consumes only your assigned shortcut keys, including repeat and release. No keystroke history is stored. Run as administrator when needed for an elevated target.");
         }
-        private static void Combo(Control parent, ComboBox combo, int x, int y, int width, object[] choices)
+        private static void Combo(Control parent, ChoiceField combo, int x, int y, int width, object[] choices)
         {
-            combo.DropDownStyle = ComboBoxStyle.DropDownList; combo.FlatStyle = FlatStyle.Flat;
-            combo.Font = new Font(Theme.FontName, 10); combo.DrawMode = DrawMode.OwnerDrawFixed;
-            combo.Items.AddRange(choices); combo.AccessibleName = choices == null ? "Choice" : "Select option";
-            combo.DrawItem += delegate(object sender, DrawItemEventArgs e) {
-                using (SolidBrush fill = new SolidBrush(Theme.Field)) e.Graphics.FillRectangle(fill, e.Bounds);
-                if (e.Index >= 0) TextRenderer.DrawText(e.Graphics, combo.Items[e.Index].ToString(), e.Font, e.Bounds, Theme.Ink, TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
-            };
+            combo.Font = Theme.Font(10, false);
+            combo.Items.AddRange(choices); combo.AccessibleName = "Select option";
             parent.Controls.Add(new InputFrame(combo, x, y, width));
         }
         private int SelectedMask()
@@ -250,26 +248,41 @@ namespace ClickGoblin
             menu.Items.Add("Open Click Goblin", null, delegate { RestoreWindow(); });
             menu.Items.Add("Start / stop", null, delegate { Toggle(); });
             menu.Items.Add("Emergency stop", null, delegate { Stop(); });
-            menu.Items.Add("Quit", null, delegate { Close(); });
+            menu.Items.Add("Quit", null, delegate { QuitApplication(); });
             tray.ContextMenuStrip = menu; tray.DoubleClick += delegate { RestoreWindow(); };
         }
         private void RestoreWindow() { Show(); WindowState = FormWindowState.Normal; Activate(); tray.Visible = false; }
+        private void HideToTray() { tray.Visible = true; Hide(); }
+        private void QuitApplication() { forceExit = true; Close(); }
+        private void ShowAbout()
+        {
+            using (Form info = new Form { Text = "About Click Goblin", Size = new Size(620, 540), StartPosition = FormStartPosition.CenterParent, BackColor = Theme.Background, MinimizeBox = false, MaximizeBox = false })
+            using (TextBox text = new TextBox { Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical, Dock = DockStyle.Fill, BorderStyle = BorderStyle.None, BackColor = Theme.Surface, ForeColor = Theme.Ink, Font = Theme.Font(10, false) })
+            {
+                string licenses;
+                using (System.IO.StreamReader reader = new System.IO.StreamReader(typeof(MainForm).Assembly.GetManifestResourceStream("Outfit-OFL.txt"))) licenses = reader.ReadToEnd();
+                string appLicense;
+                using (System.IO.StreamReader reader = new System.IO.StreamReader(typeof(MainForm).Assembly.GetManifestResourceStream("ClickGoblin-LICENSE.txt"))) appLicense = reader.ReadToEnd();
+                text.Text = "Click Goblin " + typeof(MainForm).Assembly.GetName().Version + "\r\n\r\n" + appLicense.Replace("\n", "\r\n") + "\r\n\r\nOutfit font\r\n" + licenses.Replace("\n", "\r\n");
+                info.Padding = new Padding(20); info.Controls.Add(text); info.ShowDialog(this);
+            }
+        }
         protected override void OnResize(EventArgs e)
         {
             base.OnResize(e);
             if (toTray != null && toTray.Checked && WindowState == FormWindowState.Minimized && tray.Icon != null)
-            { tray.Visible = true; Hide(); }
+            { HideToTray(); }
         }
         private Card MakeCard(Control parent, int y, int height, string title)
         {
             Card card = new Card { Location = new Point(20, y), Size = new Size(540, height) }; parent.Controls.Add(card);
             Theme.Label(card, title, 24, 20, 492, 11, true, Theme.Ink); return card;
         }
-        private static void Number(Control parent, NumericUpDown n, int x, int y, int width, decimal min, decimal max, int places, decimal increment, string name)
+        private static void Number(Control parent, NumberField n, int x, int y, int width, decimal min, decimal max, int places, decimal increment, string name)
         {
             n.Minimum = min; n.Maximum = max; n.DecimalPlaces = places; n.Increment = increment;
-            n.Font = new Font(Theme.FontName, 12); n.ForeColor = Theme.Ink; n.BackColor = Theme.Field;
-            n.BorderStyle = BorderStyle.None; n.ThousandsSeparator = true; n.AccessibleName = name; parent.Controls.Add(new InputFrame(n, x, y, width));
+            n.Font = Theme.Font(12, false); n.ForeColor = Theme.Ink; n.BackColor = Theme.Field;
+            n.ThousandsSeparator = true; n.AccessibleName = name; parent.Controls.Add(new InputFrame(n, x, y, width));
         }
         private void Apply(Preferences p)
         {
@@ -281,6 +294,7 @@ namespace ClickGoblin
             multi.Checked = p.MultiEnabled; multiTiming.SelectedIndex = p.Staggered ? 1 : 0;
             for (int i = 0; i < 5; i++) multiButtons[i].Checked = (p.ButtonMask & (1 << i)) != 0;
             accentChoice.SelectedIndex = p.AccentIndex; backgroundChoice.SelectedIndex = p.BackgroundIndex; toTray.Checked = p.MinimizeToTray;
+            sound.Checked = p.ToggleSound; priority.Checked = p.PriorityHotkeys;
             int[] data = { p.ToggleKey, p.FasterKey, p.SlowerKey, p.StopKey };
             for (int i = 0; i < 4; i++) keys[i].SetBinding(data[i]);
             loading = false; UpdateTiming(); ApplyColors(); UpdateMultiControls();
@@ -290,7 +304,7 @@ namespace ClickGoblin
             seconds = Math.Max(0.002m, Math.Min(3600m, value));
             syncing = true;
             interval.Value = seconds;
-            if (!fromCps) cps.Value = Math.Max(cps.Minimum, Math.Min(cps.Maximum, 1m / seconds));
+            if (!fromCps || value != seconds) cps.Value = Math.Max(cps.Minimum, Math.Min(cps.Maximum, 1m / seconds));
             syncing = false;
             if (engine != null) engine.SetInterval((double)seconds * 1000);
             UpdateTiming();
@@ -308,6 +322,7 @@ namespace ClickGoblin
         }
         private void Unbind()
         {
+            if (hotkeyFilter != null) { hotkeyFilter.Dispose(); hotkeyFilter = null; }
             if (!IsHandleCreated) return;
             for (int i = 0; i < 4; i++) Native.UnregisterHotKey(Handle, 407 + i);
             bound = false;
@@ -329,8 +344,13 @@ namespace ClickGoblin
             }
             else
             {
+                if (priority.Checked)
+                {
+                    int[] bindings = { keys[0].Binding, keys[1].Binding, keys[2].Binding, keys[3].Binding };
+                    hotkeyFilter = new GlobalHotkeys(Handle, bindings);
+                }
                 SetStatus("Ready to click", "Switch to your app, then press " + HotkeyRules.Text(keys[0].Binding) + ".", "READY");
-                bindingHint.Text = "All four hotkeys are ready.";
+                bindingHint.Text = hotkeyFilter != null && hotkeyFilter.Ready ? "Global hotkeys ready. Assigned keys are consumed." : "All four global hotkeys are ready.";
             }
             UpdateButton();
         }
@@ -344,7 +364,7 @@ namespace ClickGoblin
         protected override void OnHandleDestroyed(EventArgs e) { Unbind(); base.OnHandleDestroyed(e); }
         protected override void WndProc(ref Message m)
         {
-            if (m.Msg == 0x0312 && !editingKeys)
+            if ((m.Msg == 0x0312 || m.Msg == GlobalHotkeys.CommandMessage) && !editingKeys)
             {
                 int id = m.WParam.ToInt32();
                 if (id == 407) Toggle();
@@ -379,6 +399,7 @@ namespace ClickGoblin
             activeDelayMs = startDelay;
             LockInputs(true); Text = "Click Goblin - Running"; UpdateButton(); UpdateSession();
             engine.Start(); refresh.Start();
+            if (sound.Checked) audio.Play(true);
         }
         private int activeDelayMs;
         private void Finish(ClickEngine source, EndReason reason)
@@ -393,11 +414,13 @@ namespace ClickGoblin
         }
         private void Stop()
         {
+            bool wasRunning = running;
             refresh.Stop();
             if (running) UpdateSession();
             if (engine != null) { engine.Dispose(); lastCount = engine.Count; engine = null; }
             running = false; ShowCount(); LockInputs(false); Text = "Click Goblin - Stopped";
             SetStatus("Stopped", "Press " + HotkeyRules.Text(keys[0].Binding) + " whenever you're ready.", "READY"); UpdateButton();
+            if (wasRunning && sound.Checked) audio.Play(false);
         }
         private void LockInputs(bool active)
         {
@@ -406,6 +429,7 @@ namespace ClickGoblin
             for (int i = 0; i < 5; i++) multiButtons[i].Enabled = !active && multi.Checked;
             buttonChoice.Enabled = !active && !multi.Checked;
             for (int i = 0; i < 4; i++) keys[i].Enabled = !active;
+            priority.Enabled = !active;
         }
         private void UpdateButton()
         {
@@ -432,15 +456,23 @@ namespace ClickGoblin
                 AlwaysOnTop = top.Checked, TargetOnly = target.Checked, SpeedStep = step.Value,
                 MultiEnabled = multi.Checked, Staggered = multiTiming.SelectedIndex == 1, ButtonMask = SelectedMask(),
                 AccentIndex = accentChoice.SelectedIndex, BackgroundIndex = backgroundChoice.SelectedIndex, MinimizeToTray = toTray.Checked,
+                ToggleSound = sound.Checked, PriorityHotkeys = priority.Checked,
                 ToggleKey = keys[0].Binding, FasterKey = keys[1].Binding, SlowerKey = keys[2].Binding, StopKey = keys[3].Binding }.Save(SettingsPath))
                 detail.Text = "Preferences could not be saved to disk.";
         }
-        protected override void OnFormClosing(FormClosingEventArgs e) { Stop(); Save(); base.OnFormClosing(e); }
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            if (!forceExit && toTray.Checked && e.CloseReason == CloseReason.UserClosing)
+            { e.Cancel = true; Save(); HideToTray(); return; }
+            Stop(); Save(); base.OnFormClosing(e);
+        }
         protected override void Dispose(bool disposing)
         {
             if (disposing)
             {
                 refresh.Dispose(); tips.Dispose();
+                if (hotkeyFilter != null) { hotkeyFilter.Dispose(); hotkeyFilter = null; }
+                audio.Dispose();
                 tray.Visible = false;
                 if (tray.ContextMenuStrip != null) tray.ContextMenuStrip.Dispose();
                 tray.Dispose();

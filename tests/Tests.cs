@@ -15,6 +15,12 @@ namespace ClickGoblin
         static object Field(object o, string name) { return o.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic).GetValue(o); }
         static object Call(object o, string name, params object[] args) { return o.GetType().GetMethod(name, BindingFlags.Instance | BindingFlags.NonPublic).Invoke(o, args); }
         static void Shot(Form f, string path) { using (Bitmap b = new Bitmap(f.Width, f.Height)) { f.DrawToBitmap(b, new Rectangle(0, 0, f.Width, f.Height)); b.Save(path); } }
+        static double Luma(Color color)
+        {
+            double[] c = { color.R / 255.0, color.G / 255.0, color.B / 255.0 };
+            for (int i = 0; i < 3; i++) c[i] = c[i] <= 0.04045 ? c[i] / 12.92 : Math.Pow((c[i] + 0.055) / 1.055, 2.4);
+            return c[0] * 0.2126 + c[1] * 0.7152 + c[2] * 0.0722;
+        }
         [STAThread]
         static int Main(string[] args)
         {
@@ -30,6 +36,23 @@ namespace ClickGoblin
                     Check(Native.Event(i, true)[0].mouse.mouseData == (i == 3 ? 1u : i == 4 ? 2u : 0u), "Side button data");
                 }
                 Check(HotkeyRules.Valid((int)(Keys.Control | Keys.Shift | Keys.G)) && HotkeyRules.Valid((int)Keys.F6) && !HotkeyRules.Valid((int)Keys.G), "Hotkey validation");
+                HotkeyMatcher matcher = new HotkeyMatcher(new int[] { (int)Keys.F6, (int)(Keys.Control | Keys.Up) });
+                int action;
+                Check(matcher.Process((int)Keys.F6, true, 0, out action) && action == 0, "Shortcut consumed and dispatched");
+                Check(matcher.Process((int)Keys.F6, true, 0, out action) && action == -1, "Held shortcut does not repeat");
+                Check(matcher.Process((int)Keys.F6, false, 0, out action), "Shortcut release consumed");
+                Check(!matcher.Process((int)Keys.A, true, 0, out action), "Unrelated key passes through");
+                Check(!matcher.Process((int)Keys.Up, true, 0, out action), "Wrong modifiers pass through");
+                Check(matcher.Process((int)Keys.Up, true, 2, out action) && action == 1, "Modified shortcut consumed");
+                Check(matcher.Process((int)Keys.Up, false, 0, out action), "Release consumed after modifier lifted");
+                Check(!new Preferences().ToggleSound && new Preferences().PriorityHotkeys, "Sound off and shortcut priority on by default");
+                for (int a = 0; a < 12; a++) for (int bg = 0; bg < 6; bg++)
+                {
+                    Theme.Palette(a, bg);
+                    Check((Luma(Theme.Muted) + 0.05) / (Luma(Theme.Field) + 0.05) >= 4.5, "Readable muted and disabled text in every palette");
+                }
+                Theme.Palette(0, 0);
+                using (System.IO.Stream fontLicense = typeof(MainForm).Assembly.GetManifestResourceStream("Outfit-OFL.txt")) Check(fontLicense != null, "Font license embedded");
                 using (ManualResetEvent done = new ManualResetEvent(false))
                 {
                     int presses = 0, releases = 0; EndReason reason = EndReason.Stopped;
@@ -145,11 +168,11 @@ namespace ClickGoblin
                 }
                 string path = Path.Combine(root, "settings.xml");
                 Preferences p = new Preferences { Seconds = 0.002m, DurationSeconds = 120, TargetOnly = true, SpeedStep = 10, FasterKey = (int)(Keys.Control | Keys.Up),
-                    MultiEnabled = true, Staggered = true, ButtonMask = 21, AccentIndex = 3, BackgroundIndex = 2, MinimizeToTray = true };
+                    MultiEnabled = true, Staggered = true, ButtonMask = 21, AccentIndex = 11, BackgroundIndex = 5, MinimizeToTray = true, ToggleSound = true, PriorityHotkeys = false };
                 Check(p.Save(path), "Settings saved");
                 Preferences saved = Preferences.Load(path);
                 Check(saved.Seconds == 0.002m && saved.DurationSeconds == 120 && saved.TargetOnly && saved.SpeedStep == 10 && saved.FasterKey == (int)(Keys.Control | Keys.Up), "Settings round trip");
-                Check(saved.MultiEnabled && saved.Staggered && saved.ButtonMask == 21 && saved.AccentIndex == 3 && saved.BackgroundIndex == 2 && saved.MinimizeToTray, "Multi-button and appearance settings persist");
+                Check(saved.MultiEnabled && saved.Staggered && saved.ButtonMask == 21 && saved.AccentIndex == 11 && saved.BackgroundIndex == 5 && saved.MinimizeToTray && saved.ToggleSound && !saved.PriorityHotkeys, "Multi-button, feedback and appearance settings persist");
                 File.WriteAllText(path, "bad xml"); Check(Preferences.Load(path).Seconds == 0.5m, "Corrupt preferences fallback");
                 if (!skipUi)
                 {
@@ -157,34 +180,46 @@ namespace ClickGoblin
                 using (MainForm f = new MainForm(uiPath))
                 {
                     f.Show(); Check((bool)Field(f, "bound"), "Default hotkeys bind");
+                    Check(((GlobalHotkeys)Field(f, "hotkeyFilter")).Ready, "Shortcut consumption hook installed");
                     Shot(f, Path.Combine(args[0], "clicking.png"));
                     Call(f, "ShowPage", true); Shot(f, Path.Combine(args[0], "hotkeys.png"));
                     Call(f, "ShowPage", false);
                     Call(f, "SelectPage", 1);
-                    ((CheckBox)Field(f, "multi")).Checked = true;
+                    ((ToggleSwitch)Field(f, "multi")).Checked = true;
                     Shot(f, Path.Combine(args[0], "gang.png"));
-                    Check(!((ComboBox)Field(f, "buttonChoice")).Enabled, "Multi mode replaces single selector");
-                    CheckBox[] gangButtons = (CheckBox[])Field(f, "multiButtons");
-                    foreach (CheckBox box in gangButtons) box.Checked = false;
+                    Check(!((ChoiceField)Field(f, "buttonChoice")).Enabled, "Multi mode replaces single selector");
+                    ToggleSwitch[] gangButtons = (ToggleSwitch[])Field(f, "multiButtons");
+                    foreach (ToggleSwitch box in gangButtons) box.Checked = false;
                     Check(!((Button)Field(f, "toggle")).Enabled, "Empty group cannot start");
                     gangButtons[0].Checked = gangButtons[1].Checked = true;
-                    ((CheckBox)Field(f, "multi")).Checked = false;
+                    ((ToggleSwitch)Field(f, "multi")).Checked = false;
+                    Shot(f, Path.Combine(args[0], "gang-disabled.png"));
                     Call(f, "SelectPage", 3);
                     Shot(f, Path.Combine(args[0], "settings.png"));
-                    ((ComboBox)Field(f, "accentChoice")).SelectedIndex = 1;
+                    ((ChoiceField)Field(f, "accentChoice")).SelectedIndex = 1;
                     Check(Theme.Accent.G > Theme.Accent.R, "Accent changes live");
-                    ((ComboBox)Field(f, "backgroundChoice")).SelectedIndex = 2;
+                    ((ChoiceField)Field(f, "backgroundChoice")).SelectedIndex = 2;
                     Check(Theme.Background.B > Theme.Background.R, "Background changes live");
-                    ((ComboBox)Field(f, "accentChoice")).SelectedIndex = 0;
-                    ((ComboBox)Field(f, "backgroundChoice")).SelectedIndex = 0;
-                    ((CheckBox)Field(f, "toTray")).Checked = true;
+                    ((ChoiceField)Field(f, "accentChoice")).SelectedIndex = 0;
+                    ((ChoiceField)Field(f, "backgroundChoice")).SelectedIndex = 0;
+                    ((ToggleSwitch)Field(f, "toTray")).Checked = true;
                     f.WindowState = FormWindowState.Minimized;
                     Check(!f.Visible && ((NotifyIcon)Field(f, "tray")).Visible, "Minimize to tray");
                     Call(f, "RestoreWindow"); Check(f.Visible && !((NotifyIcon)Field(f, "tray")).Visible, "Restore from tray");
-                    ((CheckBox)Field(f, "toTray")).Checked = false;
+                    f.Close(); Check(!f.IsDisposed && !f.Visible && ((NotifyIcon)Field(f, "tray")).Visible, "X closes to tray when enabled");
+                    Call(f, "RestoreWindow");
+                    ((ToggleSwitch)Field(f, "toTray")).Checked = false;
                     Call(f, "ShowPage", false);
-                    NumericUpDown rate = (NumericUpDown)Field(f, "cps");
-                    NumericUpDown interval = (NumericUpDown)Field(f, "interval");
+                    ChoiceField picker = (ChoiceField)Field(f, "buttonChoice");
+                    picker.OpenMenu(); ToolStripDropDown menu = (ToolStripDropDown)Field(picker, "popup");
+                    Check(menu.Visible, "Custom picker opens");
+                    Control list = ((ToolStripControlHost)menu.Items[0]).Control;
+                    using (Bitmap image = new Bitmap(menu.Width, menu.Height)) { menu.DrawToBitmap(image, new Rectangle(0, 0, menu.Width, menu.Height)); image.Save(Path.Combine(args[0], "dropdown.png")); }
+                    Call(list, "OnKeyDown", new KeyEventArgs(Keys.Down)); Call(list, "OnKeyDown", new KeyEventArgs(Keys.Enter));
+                    Check(picker.SelectedIndex == 1 && !menu.Visible, "Custom picker keyboard selection"); picker.SelectedIndex = 0;
+                    NumberField rate = (NumberField)Field(f, "cps");
+                    NumberField interval = (NumberField)Field(f, "interval");
+                    ((TextBox)Field(rate, "edit")).Text = "invalid"; rate.Commit(); Check(rate.Value == 2, "Invalid numeric entry restores current value");
                     rate.Value = 100; Check(interval.Value == 0.01m, "CPS to interval");
                     interval.Value = 0.5m; Check(rate.Value == 2, "Interval to CPS");
                     interval.Value = 3600; Check(rate.Value < 0.001m, "Long interval displays matching fractional CPS");
@@ -194,7 +229,7 @@ namespace ClickGoblin
                     Check(!(bool)Field(f, "bound"), "Duplicate hotkeys prevent start");
                     boxes[1].SetBinding((int)(Keys.Control | Keys.Up)); Call(f, "Bind");
                     Check((bool)Field(f, "bound"), "Custom combination binds");
-                    ((NumericUpDown)Field(f, "delay")).Value = 60;
+                    ((NumberField)Field(f, "delay")).Value = 60;
                     Call(f, "Toggle"); Check(Field(f, "engine") != null, "Start");
                     Check(rate.Enabled && !boxes[0].Enabled, "Live rate enabled; hotkey editing locked");
                     Call(f, "AdjustSpeed", 1); Check(rate.Value == 7, "Live faster hotkey step");
@@ -202,7 +237,9 @@ namespace ClickGoblin
                     rate.Value = 500; Call(f, "AdjustSpeed", 1); Check(rate.Value == 500, "Maximum CPS clamp");
                     rate.Value = 0.01m; Call(f, "AdjustSpeed", -1); Check(rate.Value == 0.01m, "Minimum adjustment clamp");
                     Call(f, "Stop"); Check(Field(f, "engine") == null, "Stop");
-                    Call(f, "Toggle"); f.Close(); Check(Field(f, "engine") == null, "Close cancels countdown");
+                    ((ToggleSwitch)Field(f, "toTray")).Checked = true;
+                    Call(f, "Toggle"); f.Close(); Check(Field(f, "engine") != null && !f.Visible, "Close-to-tray preserves active countdown");
+                    Call(f, "QuitApplication"); Check(Field(f, "engine") == null && f.IsDisposed, "Quit stops input and exits even in tray mode");
                 }
                 }
                 Console.WriteLine("PASS: native input, mouse buttons, single and grouped cycles, staggered phases, release on stop, app gate, limits, live speed and preferences. No real clicks generated.");
