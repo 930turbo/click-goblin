@@ -20,7 +20,8 @@ namespace ClickGoblin
         {
             try
             {
-                Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
+                bool skipUi = Array.IndexOf(args, "--skip-ui") >= 0;
+                if (!skipUi) { Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false); }
                 Check(Marshal.SizeOf(typeof(Native.INPUT)) == (IntPtr.Size == 8 ? 40 : 28), "Native input ABI");
                 uint[] down = { 2, 8, 32, 128, 128 };
                 for (int i = 0; i < 5; i++)
@@ -92,15 +93,17 @@ namespace ClickGoblin
                         Console.WriteLine("High-speed fake-input sample: " + e.Count + " clicks in " + timer.ElapsedMilliseconds + " ms (500 CPS requested).");
                     }
                 }
-                string root = Path.Combine(args[0], "preferences"); Directory.CreateDirectory(root);
+                string root = Path.Combine(args[0], "preferences-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(root);
                 string path = Path.Combine(root, "settings.xml");
                 Preferences p = new Preferences { Seconds = 0.002m, DurationSeconds = 120, TargetOnly = true, SpeedStep = 10, FasterKey = (int)(Keys.Control | Keys.Up) };
                 Check(p.Save(path), "Settings saved");
                 Preferences saved = Preferences.Load(path);
                 Check(saved.Seconds == 0.002m && saved.DurationSeconds == 120 && saved.TargetOnly && saved.SpeedStep == 10 && saved.FasterKey == (int)(Keys.Control | Keys.Up), "Settings round trip");
                 File.WriteAllText(path, "bad xml"); Check(Preferences.Load(path).Seconds == 0.5m, "Corrupt preferences fallback");
+                if (!skipUi)
+                {
                 string uiPath = Path.Combine(root, "ui.xml");
-                using (GoblinForm f = new GoblinForm(uiPath))
+                using (MainForm f = new MainForm(uiPath))
                 {
                     f.Show(); Check((bool)Field(f, "bound"), "Default hotkeys bind");
                     Shot(f, Path.Combine(args[0], "clicking.png"));
@@ -127,7 +130,9 @@ namespace ClickGoblin
                     Call(f, "Stop"); Check(Field(f, "engine") == null, "Stop");
                     Call(f, "Toggle"); f.Close(); Check(Field(f, "engine") == null, "Close cancels countdown");
                 }
-                Console.WriteLine("PASS: native input, all mouse buttons, timing, finite clicks, cancellation/release, app gate, duration, live speed, high CPS, preferences, UI, hotkey conflicts, CPS sync, close. No real clicks generated.");
+                }
+                Console.WriteLine("PASS: native input, mouse buttons, timing, click limits, cancellation/release, app gate, duration, live speed, high CPS and preferences. No real clicks generated.");
+                Console.WriteLine(skipUi ? "UI checks skipped (CI mode)." : "PASS: UI, hotkey conflicts, CPS sync and close.");
                 return 0;
             }
             catch (Exception ex) { Console.Error.WriteLine(ex); return 1; }

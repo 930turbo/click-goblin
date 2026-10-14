@@ -1,0 +1,35 @@
+name: Windows build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Build
+        shell: pwsh
+        run: ./scripts/build.ps1
+      - name: Test input engine and preferences
+        shell: pwsh
+        run: ./scripts/test.ps1 -SkipUi
+      - name: Package
+        shell: pwsh
+        run: ./scripts/package.ps1
+      - name: Upload portable build
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ClickGoblin-windows
+          path: release/*
+          if-no-files-found: error

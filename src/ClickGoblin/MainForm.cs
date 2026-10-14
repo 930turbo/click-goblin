@@ -7,138 +7,7 @@ using System.Windows.Forms;
 
 namespace ClickGoblin
 {
-    internal static class Theme
-    {
-        internal static readonly Color Background = Color.FromArgb(20, 22, 30);
-        internal static readonly Color Ink = Color.FromArgb(238, 240, 247);
-        internal static readonly Color Muted = Color.FromArgb(157, 167, 188);
-        internal static readonly Color Accent = Color.FromArgb(180, 153, 255);
-        internal static readonly Color Surface = Color.FromArgb(29, 32, 43);
-        internal static readonly Color Field = Color.FromArgb(38, 42, 56);
-        internal static readonly Color Border = Color.FromArgb(52, 58, 75);
-        internal static GraphicsPath Round(RectangleF box, float radius)
-        {
-            float d = radius * 2;
-            GraphicsPath p = new GraphicsPath();
-            p.AddArc(box.X, box.Y, d, d, 180, 90);
-            p.AddArc(box.Right - d, box.Y, d, d, 270, 90);
-            p.AddArc(box.Right - d, box.Bottom - d, d, d, 0, 90);
-            p.AddArc(box.X, box.Bottom - d, d, d, 90, 90);
-            p.CloseFigure();
-            return p;
-        }
-        internal static Label Label(Control parent, string text, int x, int y, int width, float size, bool bold, Color color)
-        {
-            Label label = new Label { Text = text, Location = new Point(x, y), Size = new Size(width, 25),
-                Font = new Font("Segoe UI", size, bold ? FontStyle.Bold : FontStyle.Regular), ForeColor = color,
-                BackColor = Color.Transparent, AutoEllipsis = true };
-            parent.Controls.Add(label);
-            return label;
-        }
-    }
-
-    internal sealed class Card : Panel
-    {
-        internal Card() { DoubleBuffered = true; BackColor = Theme.Background; }
-        protected override void OnPaintBackground(PaintEventArgs e)
-        {
-            e.Graphics.Clear(Theme.Background);
-            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            using (GraphicsPath path = Theme.Round(new RectangleF(0.5f, 0.5f, Width - 2, Height - 2), 12))
-            using (SolidBrush fill = new SolidBrush(Theme.Surface))
-            using (Pen pen = new Pen(Theme.Border))
-            { e.Graphics.FillPath(fill, path); e.Graphics.DrawPath(pen, path); }
-        }
-    }
-
-    internal sealed class ActionButton : Button
-    {
-        private bool hover;
-        internal bool Active;
-        internal ActionButton()
-        {
-            FlatStyle = FlatStyle.Flat;
-            FlatAppearance.BorderSize = 0;
-            Cursor = Cursors.Hand;
-            Font = new Font("Segoe UI", 11, FontStyle.Bold);
-            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
-        }
-        protected override void OnMouseEnter(EventArgs e) { hover = true; Invalidate(); base.OnMouseEnter(e); }
-        protected override void OnMouseLeave(EventArgs e) { hover = false; Invalidate(); base.OnMouseLeave(e); }
-        protected override void OnPaint(PaintEventArgs e)
-        {
-            e.Graphics.Clear(Theme.Background);
-            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            Color color = !Enabled ? Theme.Muted : Active ? Color.FromArgb(159, 54, 73) : Color.FromArgb(103, 76, 179);
-            if (hover && Enabled) color = ControlPaint.Dark(color, 0.12f);
-            using (GraphicsPath path = Theme.Round(new RectangleF(0, 0, Width - 1, Height - 1), 10))
-            using (SolidBrush brush = new SolidBrush(color)) e.Graphics.FillPath(brush, path);
-            TextRenderer.DrawText(e.Graphics, Text, Font, ClientRectangle, Color.White,
-                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
-            if (Focused && ShowFocusCues) ControlPaint.DrawFocusRectangle(e.Graphics, new Rectangle(6, 6, Width - 13, Height - 13), Color.White, color);
-        }
-    }
-
-    internal sealed class BrandMark : Control
-    {
-        internal BrandMark() { DoubleBuffered = true; }
-        protected override void OnPaint(PaintEventArgs e)
-        {
-            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            float scale = Width / 40f;
-            e.Graphics.ScaleTransform(scale, scale);
-            using (GraphicsPath path = Theme.Round(new RectangleF(0, 0, 40, 40), 12))
-            using (SolidBrush brush = new SolidBrush(Theme.Accent)) e.Graphics.FillPath(brush, path);
-            using (SolidBrush ink = new SolidBrush(Theme.Background))
-            using (SolidBrush eye = new SolidBrush(Color.White))
-            using (GraphicsPath head = Theme.Round(new RectangleF(11, 10, 18, 23), 8))
-            using (Pen grin = new Pen(Theme.Accent, 1.8f))
-            {
-                e.Graphics.FillPolygon(ink, new PointF[] { new PointF(5, 9), new PointF(7, 23), new PointF(17, 16) });
-                e.Graphics.FillPolygon(ink, new PointF[] { new PointF(35, 9), new PointF(33, 23), new PointF(23, 16) });
-                e.Graphics.FillPath(ink, head);
-                e.Graphics.FillEllipse(eye, 14, 18, 4, 4); e.Graphics.FillEllipse(eye, 22, 18, 4, 4);
-                e.Graphics.DrawArc(grin, 16, 23, 8, 5, 0, 180);
-            }
-        }
-    }
-
-    internal sealed class RateControl : NumericUpDown
-    {
-        protected override void UpdateEditText()
-        {
-            // Preserve precision for long intervals without padding every rate with zeroes.
-            Text = Value.ToString("0.######", CultureInfo.CurrentCulture);
-        }
-    }
-
-    internal sealed class HotkeyBox : TextBox
-    {
-        internal int Binding;
-        internal event EventHandler BindingChanged;
-        internal HotkeyBox()
-        {
-            ReadOnly = true; ShortcutsEnabled = false;
-            BackColor = Theme.Field; ForeColor = Theme.Ink;
-            BorderStyle = BorderStyle.FixedSingle;
-            Font = new Font("Segoe UI", 11);
-            TextAlign = HorizontalAlignment.Center;
-        }
-        internal void SetBinding(int value) { Binding = value; Text = HotkeyRules.Text(value); }
-        protected override void OnKeyDown(KeyEventArgs e)
-        {
-            base.OnKeyDown(e);
-            if (e.KeyCode == Keys.Tab) return;
-            e.SuppressKeyPress = true; e.Handled = true;
-            if (HotkeyRules.Valid((int)e.KeyData))
-            {
-                SetBinding((int)e.KeyData);
-                if (BindingChanged != null) BindingChanged(this, EventArgs.Empty);
-            }
-        }
-    }
-
-    internal sealed class GoblinForm : Form
+    internal sealed class MainForm : Form
     {
         private readonly ComboBox buttonChoice = new ComboBox();
         private readonly NumericUpDown cps = new RateControl(), interval = new NumericUpDown(), hold = new NumericUpDown();
@@ -160,31 +29,31 @@ namespace ClickGoblin
         private string testSettingsPath;
         private string SettingsPath { get { return testSettingsPath ?? Preferences.PathName; } }
 
-        internal GoblinForm() : this(null) { }
+        internal MainForm() : this(null) { }
         // Isolated preferences path makes UI tests non-destructive.
-        internal GoblinForm(string preferencesPath)
+        internal MainForm(string preferencesPath)
         {
             testSettingsPath = preferencesPath;
             Text = "Click Goblin - Stopped";
-            ClientSize = new Size(520, 778);
+            ClientSize = new Size(580, 866);
             AutoScaleDimensions = new SizeF(96, 96); AutoScaleMode = AutoScaleMode.Dpi;
-            FormBorderStyle = FormBorderStyle.FixedSingle; MaximizeBox = false;
+            FormBorderStyle = FormBorderStyle.Sizable; MinimumSize = new Size(600, 520);
             StartPosition = FormStartPosition.CenterScreen;
             BackColor = Theme.Background; ForeColor = Theme.Ink;
             Font = new Font("Segoe UI", 9.5f); DoubleBuffered = true;
-            Icon = Icon.ExtractAssociatedIcon(typeof(GoblinForm).Assembly.Location);
+            Icon = Icon.ExtractAssociatedIcon(typeof(MainForm).Assembly.Location);
             Controls.Add(new BrandMark { Location = new Point(22, 19), Size = new Size(40, 40) });
             Theme.Label(this, "Click Goblin", 74, 14, 315, 23, true, Theme.Ink).Height = 42;
-            badge = Theme.Label(this, "READY", 390, 28, 108, 9, true, Theme.Accent);
+            badge = Theme.Label(this, "READY", 450, 28, 108, 9, true, Theme.Accent);
             badge.TextAlign = ContentAlignment.MiddleRight;
-            Nav(clickTab, "Clicking", 20, true); Nav(keysTab, "Hotkeys", 142, false);
+            Nav(clickTab, "Clicking", 20, true); Nav(keysTab, "Hotkeys", 160, false);
             clickTab.Click += delegate { ShowPage(false); };
             keysTab.Click += delegate { ShowPage(true); };
-            clicking.SetBounds(0, 100, 520, 490); shortcuts.Bounds = clicking.Bounds;
+            clicking.SetBounds(0, 128, 580, 540); shortcuts.Bounds = clicking.Bounds;
             Controls.Add(clicking); Controls.Add(shortcuts);
 
-            Card timing = MakeCard(clicking, 0, 226, "Click settings");
-            Theme.Label(timing, "Mouse button", 18, 55, 160, 10, false, Theme.Ink);
+            Card timing = MakeCard(clicking, 0, 260, "Click settings");
+            Theme.Label(timing, "Mouse button", 24, 73, 210, 10, false, Theme.Ink);
             buttonChoice.Items.AddRange(new object[] { "Left", "Right", "Middle", "Side / X1", "Side / X2" });
             buttonChoice.DropDownStyle = ComboBoxStyle.DropDownList; buttonChoice.FlatStyle = FlatStyle.Flat;
             buttonChoice.DrawMode = DrawMode.OwnerDrawFixed;
@@ -194,54 +63,52 @@ namespace ClickGoblin
                 e.DrawFocusRectangle();
             };
             buttonChoice.BackColor = Theme.Field; buttonChoice.ForeColor = Theme.Ink;
-            buttonChoice.SetBounds(250, 50, 210, 30); timing.Controls.Add(buttonChoice);
-            Theme.Label(timing, "Clicks per second", 18, 92, 210, 9, true, Theme.Muted);
-            Theme.Label(timing, "Interval / seconds", 250, 92, 210, 9, true, Theme.Muted);
-            Number(timing, cps, 18, 118, 210, 0.000001m, 500, 6, 1, "Clicks per second");
-            Number(timing, interval, 250, 118, 210, 0.002m, 3600, 3, 0.005m, "Interval in seconds");
-            Theme.Label(timing, "Hold / ms", 18, 164, 100, 9, true, Theme.Muted);
-            Number(timing, hold, 130, 159, 98, 1, 1000, 0, 5, "Button hold time in milliseconds");
-            timingHint = Theme.Label(timing, "", 250, 165, 210, 9, false, Theme.Muted);
-            Theme.Label(timing, "CPS and interval stay linked. Speed can change while running.", 18, 199, 448, 8.5f, false, Theme.Muted);
+            timing.Controls.Add(new InputFrame(buttonChoice, 282, 62, 234));
+            Theme.Label(timing, "Clicks per second", 24, 119, 234, 9, true, Theme.Muted);
+            Theme.Label(timing, "Interval / seconds", 282, 119, 234, 9, true, Theme.Muted);
+            Number(timing, cps, 24, 148, 234, 0.000001m, 500, 6, 1, "Clicks per second");
+            Number(timing, interval, 282, 148, 234, 0.002m, 3600, 3, 0.005m, "Interval in seconds");
+            Theme.Label(timing, "Hold / ms", 24, 216, 100, 9, true, Theme.Muted);
+            Number(timing, hold, 130, 204, 128, 1, 1000, 0, 5, "Button hold time in milliseconds");
+            timingHint = Theme.Label(timing, "", 282, 216, 234, 9, false, Theme.Muted);
 
-            Card session = MakeCard(clicking, 238, 252, "Session options");
-            Theme.Label(session, "Start delay / seconds", 18, 53, 210, 9, true, Theme.Muted);
-            Theme.Label(session, "Stop after / clicks", 250, 53, 210, 9, true, Theme.Muted);
-            Number(session, delay, 18, 79, 210, 0, 60, 0, 1, "Start delay in seconds");
-            Number(session, limit, 250, 79, 210, 0, 1000000, 0, 10, "Click limit, zero for unlimited");
-            Theme.Label(session, "Stop after / seconds", 18, 124, 210, 9, true, Theme.Muted);
-            Number(session, duration, 18, 150, 210, 0, 86400, 0, 10, "Session duration, zero for unlimited");
-            top.Text = "Keep on top"; top.SetBounds(250, 150, 208, 28); top.BackColor = Theme.Surface;
+            Card session = MakeCard(clicking, 276, 264, "Session options");
+            Theme.Label(session, "Start delay / seconds", 24, 60, 234, 9, true, Theme.Muted);
+            Theme.Label(session, "Click limit (0 = unlimited)", 282, 60, 234, 9, true, Theme.Muted);
+            Number(session, delay, 24, 88, 234, 0, 60, 0, 1, "Start delay in seconds");
+            Number(session, limit, 282, 88, 234, 0, 1000000, 0, 10, "Click limit, zero for unlimited");
+            Theme.Label(session, "Time limit / seconds (0 = unlimited)", 24, 148, 252, 9, true, Theme.Muted);
+            Number(session, duration, 24, 176, 234, 0, 86400, 0, 10, "Session duration, zero for unlimited");
+            top.Text = "Keep on top"; top.SetBounds(282, 183, 234, 30); top.BackColor = Theme.Surface;
             session.Controls.Add(top);
             target.Text = "Lock to first app (pause when I Alt-Tab)";
-            target.SetBounds(18, 193, 440, 27); target.BackColor = Theme.Surface; session.Controls.Add(target);
-            Theme.Label(session, "Set either stop limit to 0 for unlimited.", 18, 225, 442, 8.5f, false, Theme.Muted);
+            target.SetBounds(24, 231, 492, 27); target.BackColor = Theme.Surface; session.Controls.Add(target);
 
-            Card bindings = MakeCard(shortcuts, 0, 346, "Hotkeys");
+            Card bindings = MakeCard(shortcuts, 0, 384, "Hotkeys");
             string[] names = { "Start / stop", "Faster", "Slower", "Emergency stop" };
             for (int i = 0; i < 4; i++)
             {
-                Theme.Label(bindings, names[i], 18, 61 + i * 53, 220, 10, false, Theme.Ink);
-                keys[i].SetBounds(250, 57 + i * 53, 210, 30); bindings.Controls.Add(keys[i]);
+                Theme.Label(bindings, names[i], 24, 74 + i * 65, 234, 10, false, Theme.Ink);
+                bindings.Controls.Add(new InputFrame(keys[i], 282, 62 + i * 65, 234));
                 keys[i].AccessibleName = names[i] + " hotkey";
                 keys[i].Enter += delegate { editingKeys = true; Unbind(); UpdateButton(); };
                 keys[i].Leave += delegate { editingKeys = false; Bind(); Save(); };
             }
-            Theme.Label(bindings, "Click a box and press an F-key or Ctrl / Alt + a key.", 18, 278, 444, 9, false, Theme.Muted);
-            bindingHint = Theme.Label(bindings, "", 18, 307, 444, 9, false, Theme.Accent);
-            Card tuning = MakeCard(shortcuts, 358, 132, "Speed adjustment");
-            Theme.Label(tuning, "CPS per hotkey press", 18, 57, 220, 10, false, Theme.Ink);
-            Number(tuning, step, 250, 52, 210, 0.1m, 100, 1, 1, "CPS change per hotkey press");
-            Theme.Label(tuning, "Faster / slower works without leaving your game.", 18, 98, 444, 8.5f, false, Theme.Muted);
+            Theme.Label(bindings, "Click a box and press an F-key or Ctrl / Alt + a key.", 24, 324, 492, 9, false, Theme.Muted);
+            bindingHint = Theme.Label(bindings, "", 24, 354, 492, 9, false, Theme.Accent);
+            Card tuning = MakeCard(shortcuts, 400, 140, "Speed adjustment");
+            Theme.Label(tuning, "CPS per hotkey press", 24, 74, 234, 10, false, Theme.Ink);
+            Number(tuning, step, 282, 62, 234, 0.1m, 100, 1, 1, "CPS change per hotkey press");
+            Theme.Label(tuning, "Faster / slower works without leaving your game.", 24, 110, 492, 8.5f, false, Theme.Muted);
 
-            status = Theme.Label(this, "Ready", 22, 612, 330, 12, true, Theme.Ink);
-            detail = Theme.Label(this, "", 22, 642, 340, 9, false, Theme.Muted);
-            counter = Theme.Label(this, "0 clicks", 364, 612, 134, 12, true, Theme.Ink);
+            status = Theme.Label(this, "Ready", 24, 694, 354, 12, true, Theme.Ink);
+            detail = Theme.Label(this, "", 24, 724, 354, 9, false, Theme.Muted);
+            counter = Theme.Label(this, "0 clicks", 410, 694, 146, 12, true, Theme.Ink);
             counter.TextAlign = ContentAlignment.TopRight;
-            elapsed = Theme.Label(this, "00:00 elapsed", 364, 642, 134, 9, false, Theme.Muted);
+            elapsed = Theme.Label(this, "00:00 elapsed", 410, 724, 146, 9, false, Theme.Muted);
             elapsed.TextAlign = ContentAlignment.TopRight;
-            toggle.SetBounds(20, 683, 480, 48); toggle.Click += delegate { Toggle(); }; Controls.Add(toggle);
-            reset.Text = "Reset defaults"; reset.SetBounds(358, 747, 142, 23); reset.TextAlign = ContentAlignment.MiddleRight;
+            toggle.SetBounds(20, 764, 540, 52); toggle.Click += delegate { Toggle(); }; Controls.Add(toggle);
+            reset.Text = "Reset defaults"; reset.SetBounds(398, 835, 162, 23); reset.TextAlign = ContentAlignment.MiddleRight;
             reset.LinkColor = Theme.Muted; reset.ActiveLinkColor = Theme.Accent; reset.LinkBehavior = LinkBehavior.HoverUnderline;
             reset.LinkClicked += delegate { Apply(new Preferences()); Bind(); Save(); }; Controls.Add(reset);
 
@@ -256,10 +123,19 @@ namespace ClickGoblin
             tips.SetToolTip(target, "Captures the first foreground app after starting, excluding Click Goblin. Pauses in other apps and resumes on return.");
             tips.SetToolTip(duration, "Wall-clock limit after countdown, including time paused by the app lock. 0 disables.");
             ShowPage(false); UpdateButton();
+            Panel viewport = new Panel { Dock = DockStyle.Fill, AutoScroll = true, BackColor = Theme.Background };
+            Panel content = new Panel { Size = new Size(580, 866), BackColor = Theme.Background };
+            Control[] children = new Control[Controls.Count]; Controls.CopyTo(children, 0);
+            foreach (Control child in children) content.Controls.Add(child);
+            viewport.Controls.Add(content); Controls.Add(viewport);
+            viewport.Resize += delegate { content.Left = Math.Max(0, (viewport.ClientSize.Width - content.Width) / 2); };
+            Rectangle area = Screen.FromControl(this).WorkingArea;
+            ClientSize = new Size(600, Math.Min(866, Math.Max(480, area.Height - 100)));
+
         }
         private void Nav(Button b, string text, int x, bool selected)
         {
-            b.Text = text; b.SetBounds(x, 69, 112, 29); b.FlatStyle = FlatStyle.Flat; b.FlatAppearance.BorderSize = 0;
+            b.Text = text; b.SetBounds(x, 78, 128, 36); b.FlatStyle = FlatStyle.Flat; b.FlatAppearance.BorderSize = 0;
             b.ForeColor = Theme.Ink; b.BackColor = selected ? Theme.Field : Theme.Background;
             b.Cursor = Cursors.Hand; Controls.Add(b);
         }
@@ -272,14 +148,14 @@ namespace ClickGoblin
         }
         private Card MakeCard(Control parent, int y, int height, string title)
         {
-            Card card = new Card { Location = new Point(20, y), Size = new Size(480, height) }; parent.Controls.Add(card);
-            Theme.Label(card, title, 18, 15, 440, 11, true, Theme.Ink); return card;
+            Card card = new Card { Location = new Point(20, y), Size = new Size(540, height) }; parent.Controls.Add(card);
+            Theme.Label(card, title, 24, 20, 492, 11, true, Theme.Ink); return card;
         }
         private static void Number(Control parent, NumericUpDown n, int x, int y, int width, decimal min, decimal max, int places, decimal increment, string name)
         {
-            n.SetBounds(x, y, width, 30); n.Minimum = min; n.Maximum = max; n.DecimalPlaces = places; n.Increment = increment;
+            n.Minimum = min; n.Maximum = max; n.DecimalPlaces = places; n.Increment = increment;
             n.Font = new Font("Segoe UI", 12); n.ForeColor = Theme.Ink; n.BackColor = Theme.Field;
-            n.BorderStyle = BorderStyle.FixedSingle; n.ThousandsSeparator = true; n.AccessibleName = name; parent.Controls.Add(n);
+            n.BorderStyle = BorderStyle.None; n.ThousandsSeparator = true; n.AccessibleName = name; parent.Controls.Add(new InputFrame(n, x, y, width));
         }
         private void Apply(Preferences p)
         {
